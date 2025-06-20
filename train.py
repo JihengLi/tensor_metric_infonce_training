@@ -2,7 +2,7 @@ import os, math, re
 import torch
 import torchio as tio
 
-from datasets import DTIContrastiveDataset
+from datasets import *
 from models import Encoder
 from utils import (
     init_weights,
@@ -40,8 +40,8 @@ if __name__ == "__main__":
             tio.CropOrPad((64, 64, 64)),
         ]
     )
-    train_dataset = DTIContrastiveDataset(path_list=train_paths, transform=None)
-    val_dataset = DTIContrastiveDataset(path_list=val_paths, transform=val_transform)
+    train_dataset = eigen(path_list=train_paths, transform=None)
+    val_dataset = eigen(path_list=val_paths, transform=val_transform)
 
     train_loader = DataLoader(
         train_dataset,
@@ -53,17 +53,17 @@ if __name__ == "__main__":
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=32,
+        batch_size=64,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
     )
 
     EPOCH_NUM = 12
-    NTX_LOSS_TEM = 0.2
+    NTX_LOSS_TEM = 0.3
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = Encoder().to(device)
+    model = Encoder(num_channels=3).to(device)
     model.apply(init_weights)
     decay, no_decay = [], []
     for n, p in model.named_parameters():
@@ -73,16 +73,16 @@ if __name__ == "__main__":
             {"params": decay, "weight_decay": 1e-2},
             {"params": no_decay, "weight_decay": 0.0},
         ],
-        lr=2e-4,
+        lr=1e-4,
         betas=(0.9, 0.95),
     )
     total_steps = EPOCH_NUM * len(train_loader)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
         max_lr=1e-3,
-        div_factor=5,
+        div_factor=10,
         final_div_factor=1e4,
-        pct_start=0.05,
+        pct_start=0.1,
         epochs=EPOCH_NUM,
         steps_per_epoch=len(train_loader),
         anneal_strategy="cos",

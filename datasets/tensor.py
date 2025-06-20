@@ -1,28 +1,18 @@
 import os
 import torch
 import torchio as tio
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 
 
-class DTIContrastiveDataset(Dataset):
+class TensorDataset(Dataset):
     """Dataset for Diffusion Tensor Imaging contrastive learning."""
 
     def __init__(self, path_list: list[str], transform: tio.Transform | None = None):
-        # self.sample_dirs = [
-        #     os.path.join(root_dir, d)
-        #     for d in os.listdir(root_dir)
-        #     if os.path.isdir(os.path.join(root_dir, d))
-        # ]
         self.sample_paths = path_list
 
         self.transform = transform or tio.Compose(
             [
-                # tio.RandomFlip(axes=(0, 1, 2), flip_probability=0.5),  # mirror
-                # tio.RandomAffine(scales=(0.9, 1.1), degrees=15, translation=5),
-                # tio.RandomElasticDeformation(
-                #     num_control_points=7, max_displacement=7.5
-                # ),
-                tio.Lambda(lambda x: self.clean_tensor(x)),
+                tio.Lambda(self._clean),
                 tio.ZNormalization(),
                 tio.RandomGamma(log_gamma=(-0.3, 0.3)),  # contrast/brightness
                 tio.RandomNoise(mean=0.0, std=(0, 0.25)),
@@ -31,10 +21,10 @@ class DTIContrastiveDataset(Dataset):
             ]
         )
 
-    def clean_tensor(self, t: torch.Tensor):
+    @staticmethod
+    def _clean(t: torch.Tensor):
         t = t.clone()
-        t[torch.isnan(t)] = 0
-        t[torch.isinf(t)] = 0
+        t[torch.isnan(t) | torch.isinf(t)] = 0
         return t
 
     def __len__(self):
