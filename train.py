@@ -76,7 +76,6 @@ if __name__ == "__main__":
         lr=1e-4,
         betas=(0.9, 0.95),
     )
-    total_steps = EPOCH_NUM * len(train_loader)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
         max_lr=1e-3,
