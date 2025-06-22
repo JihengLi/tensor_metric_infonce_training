@@ -3,6 +3,7 @@ import torch
 from torch.amp import autocast, GradScaler
 from contextlib import contextmanager
 
+
 @contextmanager
 def gpu_safe_context():
     try:

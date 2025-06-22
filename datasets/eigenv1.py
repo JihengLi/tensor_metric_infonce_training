@@ -49,24 +49,42 @@ def _tensor_to_eigvals_v1(t: torch.Tensor) -> torch.Tensor:
 
 
 class EigenvalueVectorDataset(Dataset):
-    def __init__(self, path_list: list[str], transform: tio.Transform | None = None):
+    def __init__(
+        self,
+        path_list: list[str],
+        mode: str = "train",
+        transform: tio.Transform | None = None,
+    ):
         self.sample_paths = path_list
-        self.transform = transform or tio.Compose(
-            [
-                tio.Lambda(lambda x: _tensor_to_eigvals_v1(x)),
-                tio.Lambda(self._clean),
-                tio.ZNormalization(),
-                VectorRandomFlip(axes=(0, 1, 2), p=0.5),
-                VectorRandomAffine(
-                    scales=(0.9, 1.1), degrees=15, translation=(5, 5, 5), p=0.7
-                ),
-                # TODO: VectorRandomElasticDeformation
-                tio.RandomGamma(log_gamma=(-0.3, 0.3), p=0.3),
-                tio.RandomNoise(mean=0.0, std=(0.0, 0.25), p=0.3),
-                tio.RandomBlur(std=(0.5, 1.5), p=0.2),
-                tio.CropOrPad((64, 64, 64)),
-            ]
-        )
+        if transform is not None:
+            self.transform = transform
+        else:
+            if mode == "train":
+                self.transform = tio.Compose(
+                    [
+                        tio.Lambda(lambda x: _tensor_to_eigvals_v1(x)),
+                        tio.Lambda(self._clean),
+                        tio.ZNormalization(),
+                        VectorRandomFlip(axes=(0, 1, 2), p=0.5),
+                        VectorRandomAffine(
+                            scales=(0.9, 1.1), degrees=15, translation=(5, 5, 5), p=0.7
+                        ),
+                        # TODO: VectorRandomElasticDeformation
+                        tio.RandomGamma(log_gamma=(-0.3, 0.3), p=0.3),
+                        tio.RandomNoise(mean=0.0, std=(0.0, 0.25), p=0.3),
+                        tio.RandomBlur(std=(0.5, 1.5), p=0.2),
+                        tio.CropOrPad((64, 64, 64)),
+                    ]
+                )
+            else:
+                self.transform = tio.Compose(
+                    [
+                        tio.Lambda(lambda x: _tensor_to_eigvals_v1(x)),
+                        tio.Lambda(self._clean),
+                        tio.ZNormalization(),
+                        tio.CropOrPad((64, 64, 64)),
+                    ]
+                )
 
     @staticmethod
     def _clean(t: torch.Tensor):

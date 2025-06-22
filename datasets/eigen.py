@@ -2,53 +2,105 @@ import os
 import torch
 import torchio as tio
 from torch.utils.data import Dataset
-
-
-def _tensor_to_eigenvalues(t: torch.Tensor) -> torch.Tensor:
-    Dxx, Dyy, Dzz, Dxy, Dxz, Dyz = t
-    A = torch.stack(
-        [
-            torch.stack([Dxx, Dxy, Dxz], 0),
-            torch.stack([Dxy, Dyy, Dyz], 0),
-            torch.stack([Dxz, Dyz, Dzz], 0),
-        ]
-    )  # shape (3, 3, D, H, W)
-    A = A.permute(2, 3, 4, 0, 1).reshape(-1, 3, 3)  # (N, 3, 3)
-    w = torch.linalg.eigvalsh(A).real  # (N, 3), already λ₁≤λ₂≤λ₃
-    w = w.flip(-1)  # λ₁≥λ₂≥λ₃
-    w = w.reshape(t.shape[1], t.shape[2], t.shape[3], 3).permute(3, 0, 1, 2)
-    return w.float()
+from torch.nn.functional import interpolate
 
 
 class EigenvalueDataset(Dataset):
-    def __init__(self, path_list: list[str], transform: tio.Transform | None = None):
+    def __init__(
+        self,
+        path_list: list[str],
+        mode: str = "train",
+        transform: tio.Transform | None = None,
+    ):
         self.sample_paths = path_list
-        self.transform = transform or tio.Compose(
-            [
-                tio.Lambda(lambda x: _tensor_to_eigenvalues(x)),
-                tio.Lambda(self._clean),
-                tio.ZNormalization(),
-                tio.RandomFlip(axes=(0, 1, 2), p=0.5),
-                tio.RandomAffine(
-                    scales=(0.9, 1.1),
-                    degrees=15,
-                    translation=(5, 5, 5),
-                    p=0.7,
-                ),
-                tio.RandomElasticDeformation(
-                    num_control_points=7, max_displacement=7.0, p=0.2
-                ),
-                tio.RandomGamma(log_gamma=(-0.3, 0.3), p=0.3),
-                tio.RandomNoise(mean=0.0, std=(0.0, 0.25), p=0.3),
-                tio.RandomBlur(std=(0.5, 1.5), p=0.2),
-                tio.CropOrPad((64, 64, 64)),
-            ]
-        )
+        if transform is not None:
+            self.transform = transform
+        else:
+            if mode == "train":
+                self.transform = tio.Compose(
+                    [
+                        tio.Lambda(self._tensor_to_eigenvalues),
+                        tio.Lambda(self._znorm_nonzero),
+                        tio.RandomFlip(axes=(0, 1, 2), p=0.2),
+                        tio.RandomAffine(
+                            scales=(0.9, 1.1), degrees=15, translation=(5, 5, 5), p=0.2
+                        ),
+                        tio.Lambda(self._resize_to_64),
+                        tio.RandomElasticDeformation(
+                            num_control_points=9, max_displacement=1.5, p=0.2
+                        ),
+                        tio.RandomGamma(log_gamma=(-0.3, 0.3), p=0.3),
+                        tio.RandomNoise(mean=0.0, std=(0.0, 0.25), p=0.3),
+                        tio.RandomBlur(std=(0.5, 1.5), p=0.3),
+                        tio.Lambda(self._znorm_nonzero),
+                        tio.Lambda(self._jitter_background),
+                    ]
+                )
+            else:
+                self.transform = tio.Compose(
+                    [
+                        tio.Lambda(self._tensor_to_eigenvalues),
+                        tio.Lambda(self._znorm_nonzero),
+                        tio.Lambda(self._resize_to_64),
+                    ]
+                )
 
-    @staticmethod
-    def _clean(t: torch.Tensor):
+    def _tensor_to_eigenvalues(self, t: torch.Tensor) -> torch.Tensor:
         t = t.clone()
-        t[torch.isnan(t) | torch.isinf(t)] = 0
+        t = self._clean_tensor(t)
+        Dxx, Dyy, Dzz, Dxy, Dxz, Dyz = t
+        A = torch.stack(
+            [
+                torch.stack([Dxx, Dxy, Dxz], 0),
+                torch.stack([Dxy, Dyy, Dyz], 0),
+                torch.stack([Dxz, Dyz, Dzz], 0),
+            ]
+        )  # shape (3, 3, D, H, W)
+        A = A.permute(2, 3, 4, 0, 1).reshape(-1, 3, 3)  # (N, 3, 3)
+        w = torch.linalg.eigvalsh(A).real  # (N, 3)
+        w = w.flip(-1)
+        w = w.reshape(t.shape[1], t.shape[2], t.shape[3], 3).permute(3, 0, 1, 2)
+        return w.float()
+
+    def _jitter_background(self, t: torch.Tensor, std: float = 0.02) -> torch.Tensor:
+        t = t.clone()
+        t = self._clean_tensor(t)
+        mask = t == 0
+        noise = torch.randn_like(t) * std
+        t[mask] = noise[mask]
+        return t
+
+    def _znorm_nonzero(self, t: torch.Tensor) -> torch.Tensor:
+        t = t.clone()
+        t = self._clean_tensor(t)
+        mask = t != 0
+        if mask.any():
+            vals = t[mask]
+            mu, std = vals.mean(), vals.std()
+            if std > 0:
+                t[mask] = (t[mask] - mu) / std
+        return t
+
+    def _resize_to_64(self, t: torch.Tensor) -> torch.Tensor:
+        t = t.clone()
+        t = interpolate(
+            t.unsqueeze(0),
+            size=(64, 64, 64),
+            mode="trilinear",
+            align_corners=False,
+        ).squeeze(
+            0
+        )  # (C, 64, 64, 64)
+        return t
+
+    def _clean_tensor(self, t: torch.Tensor) -> torch.Tensor:
+        t = t.clone()
+        t = self._clean_tensor(t)
+        finite = t[torch.isfinite(t)]
+        if finite.numel() > 0:
+            mx, mn = finite.max(), finite.min()
+            t[t == float("inf")] = mx
+            t[t == float("-inf")] = mn
         return t
 
     def __len__(self):
@@ -63,7 +115,12 @@ class EigenvalueDataset(Dataset):
                 idx = (idx + 1) % len(self.sample_paths)
                 continue
             try:
-                subject = tio.Subject(dti=tio.ScalarImage(nii_path))
+                img = tio.ScalarImage(nii_path).data.float()
+                img = self._clean_tensor(img)
+                if (img == 0).all() or (img.max() - img.min()) < 1e-6:
+                    idx = (idx + 1) % len(self.sample_paths)
+                    continue
+                subject = tio.Subject(dti=tio.ScalarImage(tensor=img))
                 v1 = self.transform(subject)["dti"].data.float()
                 v2 = self.transform(subject)["dti"].data.float()
                 return v1, v2

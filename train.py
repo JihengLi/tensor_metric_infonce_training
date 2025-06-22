@@ -1,6 +1,7 @@
+# nohup python3.10/bin/python3.10 train.py > out.log 2>&1 &
+
 import os, math, re
 import torch
-import torchio as tio
 
 from datasets import *
 from models import Encoder
@@ -19,6 +20,8 @@ from sklearn.model_selection import train_test_split
 from torch.amp import GradScaler
 from torch.utils.data import DataLoader
 
+EPOCH_NUM = 12
+NTX_LOSS_TEM = 0.3
 
 if __name__ == "__main__":
     home_dir = "/home-local/lij112/codes/beyond_fa_challenge/beyond_fa_infonce/tensor_metric_infonce_training"
@@ -33,34 +36,24 @@ if __name__ == "__main__":
         final_paths, test_size=0.2, random_state=42
     )
 
-    val_transform = tio.Compose(
-        [
-            tio.Lambda(lambda x: x.clone().nan_to_num_(0)),
-            tio.ZNormalization(),
-            tio.CropOrPad((64, 64, 64)),
-        ]
-    )
-    train_dataset = eigen(path_list=train_paths, transform=None)
-    val_dataset = eigen(path_list=val_paths, transform=val_transform)
-
+    train_dataset = EigenvalueDataset(path_list=train_paths, mode="train")
     train_loader = DataLoader(
         train_dataset,
         batch_size=64,
         shuffle=True,
-        num_workers=4,
+        num_workers=6,
         pin_memory=True,
         drop_last=True,
     )
+
+    val_dataset = EigenvalueDataset(path_list=val_paths, mode="val")
     val_loader = DataLoader(
         val_dataset,
         batch_size=64,
         shuffle=False,
-        num_workers=4,
+        num_workers=6,
         pin_memory=True,
     )
-
-    EPOCH_NUM = 12
-    NTX_LOSS_TEM = 0.3
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = Encoder(num_channels=3).to(device)
@@ -128,9 +121,10 @@ if __name__ == "__main__":
         # Training
         model.train()
         train_loss = 0.0
+        train_step = 0
         with gpu_safe_context():
             pbar = tqdm(train_loader, desc=f"Epoch {epoch} [Train]")
-            for step, batch in enumerate(pbar, 1):
+            for batch in pbar:
                 loss = process_train_batch(
                     batch,
                     model,
@@ -141,8 +135,12 @@ if __name__ == "__main__":
                     scaler,
                     clip_grad=5.0,
                 )
+                if math.isnan(loss):
+                    pbar.write("Skipping NaN batch")
+                    continue
+                train_step += 1
                 train_loss += loss
-                avg_loss = train_loss / step
+                avg_loss = train_loss / train_step
                 lr = scheduler.get_last_lr()[0] if scheduler else 0
                 pbar.set_postfix(
                     {
@@ -151,23 +149,27 @@ if __name__ == "__main__":
                         "lr": f"{lr:.6f}",
                     }
                 )
-        avg_train = train_loss / len(train_loader)
+        avg_train = train_loss / train_step
         print(f"Epoch {epoch}/{EPOCH_NUM} - Train Loss: {avg_train:.4f}")
 
         # Validation
         model.eval()
         val_loss = 0.0
+        val_step = 0
         with gpu_safe_context():
             pbar = tqdm(val_loader, desc=f"Epoch {epoch} [Val]")
-            for step, batch in enumerate(pbar, 1):
+            for batch in pbar:
                 loss = process_val_batch(
                     batch,
                     model,
                     device,
                     lambda q, d: nt_xent_loss(q, d, NTX_LOSS_TEM),
                 )
+                if math.isnan(loss):
+                    pbar.write("Skipping NaN batch")
+                    continue
                 val_loss += loss
-                avg_loss = val_loss / step
+                avg_loss = val_loss / val_step
                 pbar.set_postfix(
                     {
                         "loss": f"{loss:.4f}",
