@@ -32,6 +32,7 @@ class EigenvalueDataset(Dataset):
                         tio.RandomGamma(log_gamma=(-0.3, 0.3), p=0.3),
                         tio.RandomNoise(mean=0.0, std=(0.0, 0.25), p=0.3),
                         tio.RandomBlur(std=(0.5, 1.5), p=0.3),
+                        tio.Lambda(self._clean_tensor),
                         tio.Lambda(self._znorm_nonzero),
                         tio.Lambda(self._jitter_background),
                     ]
@@ -46,8 +47,6 @@ class EigenvalueDataset(Dataset):
                 )
 
     def _tensor_to_eigenvalues(self, t: torch.Tensor) -> torch.Tensor:
-        t = t.clone()
-        t = self._clean_tensor(t)
         Dxx, Dyy, Dzz, Dxy, Dxz, Dyz = t
         A = torch.stack(
             [
@@ -63,27 +62,21 @@ class EigenvalueDataset(Dataset):
         return w.float()
 
     def _jitter_background(self, t: torch.Tensor, std: float = 0.02) -> torch.Tensor:
-        t = t.clone()
-        t = self._clean_tensor(t)
         mask = t == 0
         noise = torch.randn_like(t) * std
-        t[mask] = noise[mask]
-        return t
+        return torch.where(mask, noise, t)
 
     def _znorm_nonzero(self, t: torch.Tensor) -> torch.Tensor:
-        t = t.clone()
-        t = self._clean_tensor(t)
         mask = t != 0
         if mask.any():
             vals = t[mask]
             mu, std = vals.mean(), vals.std()
             if std > 0:
-                t[mask] = (t[mask] - mu) / std
+                t = torch.where(mask, (t - mu) / std, t)
         return t
 
     def _resize_to_64(self, t: torch.Tensor) -> torch.Tensor:
-        t = t.clone()
-        t = interpolate(
+        out = interpolate(
             t.unsqueeze(0),
             size=(64, 64, 64),
             mode="trilinear",
@@ -91,16 +84,15 @@ class EigenvalueDataset(Dataset):
         ).squeeze(
             0
         )  # (C, 64, 64, 64)
-        return t
+        return out
 
     def _clean_tensor(self, t: torch.Tensor) -> torch.Tensor:
-        t = t.clone()
         t = torch.nan_to_num(t, nan=0.0)
         finite = t[torch.isfinite(t)]
         if finite.numel() > 0:
             mx, mn = finite.max(), finite.min()
-            t[t == float("inf")] = mx
-            t[t == float("-inf")] = mn
+            t = torch.where(t == float("inf"), mx, t)
+            t = torch.where(t == float("-inf"), mn, t)
         return t
 
     def __len__(self):
