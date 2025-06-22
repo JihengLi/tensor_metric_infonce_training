@@ -46,7 +46,8 @@ class EigenvalueDataset(Dataset):
                     ]
                 )
 
-    def _tensor_to_eigenvalues(self, t: torch.Tensor) -> torch.Tensor:
+    @staticmethod
+    def _tensor_to_eigenvalues(t: torch.Tensor) -> torch.Tensor:
         Dxx, Dyy, Dzz, Dxy, Dxz, Dyz = t
         A = torch.stack(
             [
@@ -61,12 +62,14 @@ class EigenvalueDataset(Dataset):
         w = w.reshape(t.shape[1], t.shape[2], t.shape[3], 3).permute(3, 0, 1, 2)
         return w.float()
 
-    def _jitter_background(self, t: torch.Tensor, std: float = 0.02) -> torch.Tensor:
+    @staticmethod
+    def _jitter_background(t: torch.Tensor, std: float = 0.02) -> torch.Tensor:
         mask = t == 0
         noise = torch.randn_like(t) * std
         return torch.where(mask, noise, t)
 
-    def _znorm_nonzero(self, t: torch.Tensor) -> torch.Tensor:
+    @staticmethod
+    def _znorm_nonzero(t: torch.Tensor) -> torch.Tensor:
         mask = t != 0
         if mask.any():
             vals = t[mask]
@@ -75,7 +78,8 @@ class EigenvalueDataset(Dataset):
                 t = torch.where(mask, (t - mu) / std, t)
         return t
 
-    def _resize_to_64(self, t: torch.Tensor) -> torch.Tensor:
+    @staticmethod
+    def _resize_to_64(t: torch.Tensor) -> torch.Tensor:
         out = interpolate(
             t.unsqueeze(0),
             size=(64, 64, 64),
@@ -86,7 +90,8 @@ class EigenvalueDataset(Dataset):
         )  # (C, 64, 64, 64)
         return out
 
-    def _clean_tensor(self, t: torch.Tensor) -> torch.Tensor:
+    @staticmethod
+    def _clean_tensor(t: torch.Tensor) -> torch.Tensor:
         t = torch.nan_to_num(t, nan=0.0)
         finite = t[torch.isfinite(t)]
         if finite.numel() > 0:
