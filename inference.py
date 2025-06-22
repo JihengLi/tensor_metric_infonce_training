@@ -1,17 +1,12 @@
 #!/usr/bin/env python
 import argparse, json, time, torch, torchio as tio
+
 from pathlib import Path
 from torch.amp import autocast
+from torch.utils.data import Dataset
 
+from datasets import *
 from models import Encoder
-
-VAL_TRANSFORM = tio.Compose(
-    [
-        tio.Lambda(lambda x: x.clone().nan_to_num_(0)),
-        tio.ZNormalization(),
-        tio.CropOrPad((64, 64, 64)),
-    ]
-)
 
 
 def get_args():
@@ -30,7 +25,8 @@ def get_args():
     return p.parse_args()
 
 
-def load_tensor(path: Path, device: torch.device) -> torch.Tensor:
+def load_tensor(path: Path, dataset: Dataset, device: torch.device) -> torch.Tensor:
+    VAL_TRANSFORM = dataset.transform
     subj = tio.Subject(dti=tio.ScalarImage(path))
     data = VAL_TRANSFORM(subj)["dti"].data.float()
     return data.unsqueeze(0).to(device, non_blocking=True)
@@ -49,12 +45,13 @@ def main():
         "cuda" if torch.cuda.is_available() and args.device == "cuda" else "cpu"
     )
 
-    model = Encoder().to(device)
+    model = Encoder(layers=3).to(device)
     ckpt = torch.load(args.ckpt, map_location=device, weights_only=False)
     model.load_state_dict(ckpt["model"] if "model" in ckpt else ckpt)
     model.eval()
 
-    tensor = load_tensor(Path(args.tensor), device)
+    dataset = EigenvalueDataset(path_list=[], mode="val")
+    tensor = load_tensor(Path(args.tensor), dataset, device)
 
     t0 = time.time()
     emb = forward_once(model, tensor)
