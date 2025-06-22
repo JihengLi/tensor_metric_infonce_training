@@ -41,7 +41,7 @@ if __name__ == "__main__":
         train_dataset,
         batch_size=64,
         shuffle=True,
-        num_workers=6,
+        num_workers=8,
         pin_memory=True,
         drop_last=True,
     )
@@ -51,7 +51,7 @@ if __name__ == "__main__":
         val_dataset,
         batch_size=64,
         shuffle=False,
-        num_workers=6,
+        num_workers=8,
         pin_memory=True,
     )
 

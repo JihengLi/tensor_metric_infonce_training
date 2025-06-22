@@ -95,7 +95,7 @@ class EigenvalueDataset(Dataset):
 
     def _clean_tensor(self, t: torch.Tensor) -> torch.Tensor:
         t = t.clone()
-        t = self._clean_tensor(t)
+        t = torch.nan_to_num(t, nan=0.0)
         finite = t[torch.isfinite(t)]
         if finite.numel() > 0:
             mx, mn = finite.max(), finite.min()
