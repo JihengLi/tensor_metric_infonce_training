@@ -21,11 +21,11 @@ class EigenvalueDataset(Dataset):
                     [
                         tio.Lambda(self._tensor_to_eigenvalues),
                         tio.Lambda(self._znorm_nonzero),
+                        tio.Lambda(self._resize_to_64),
                         tio.RandomFlip(axes=(0, 1, 2), p=0.2),
                         tio.RandomAffine(
                             scales=(0.9, 1.1), degrees=15, translation=(5, 5, 5), p=0.2
                         ),
-                        tio.Lambda(self._resize_to_64),
                         tio.RandomElasticDeformation(
                             num_control_points=9, max_displacement=1.5, p=0.2
                         ),
