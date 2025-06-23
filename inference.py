@@ -45,7 +45,7 @@ def main():
         "cuda" if torch.cuda.is_available() and args.device == "cuda" else "cpu"
     )
 
-    model = Encoder(layers=3).to(device)
+    model = Encoder(num_channels=3).to(device)
     ckpt = torch.load(args.ckpt, map_location=device, weights_only=False)
     model.load_state_dict(ckpt["model"] if "model" in ckpt else ckpt)
     model.eval()

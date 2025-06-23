@@ -36,7 +36,7 @@ if __name__ == "__main__":
         final_paths, test_size=0.2, random_state=42
     )
 
-    train_dataset = EigenvalueDataset(path_list=train_paths, mode="train")
+    train_dataset = TensorDataset(path_list=train_paths, mode="train")
     train_loader = DataLoader(
         train_dataset,
         batch_size=64,
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         drop_last=True,
     )
 
-    val_dataset = EigenvalueDataset(path_list=val_paths, mode="val")
+    val_dataset = TensorDataset(path_list=val_paths, mode="val")
     val_loader = DataLoader(
         val_dataset,
         batch_size=64,
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = Encoder(num_channels=3).to(device)
+    model = Encoder(num_channels=6).to(device)
     model.apply(init_weights)
     decay, no_decay = [], []
     for n, p in model.named_parameters():
