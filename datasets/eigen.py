@@ -22,16 +22,16 @@ class EigenvalueDataset(Dataset):
                         tio.Lambda(self._tensor_to_eigenvalues),
                         tio.Lambda(self._znorm_nonzero),
                         tio.Lambda(self._resize_to_64),
-                        tio.RandomFlip(axes=(0, 1, 2), p=0.2),
+                        tio.RandomFlip(axes=(0, 1, 2), p=0.3),
                         tio.RandomAffine(
-                            scales=(0.9, 1.1), degrees=15, translation=(5, 5, 5), p=0.2
+                            scales=(0.9, 1.1), degrees=15, translation=(5, 5, 5), p=0.3
                         ),
                         tio.RandomElasticDeformation(
-                            num_control_points=9, max_displacement=1.5, p=0.2
+                            num_control_points=9, max_displacement=1.5, p=0.3
                         ),
-                        tio.RandomGamma(log_gamma=(-0.3, 0.3), p=0.3),
-                        tio.RandomNoise(mean=0.0, std=(0.0, 0.25), p=0.3),
-                        tio.RandomBlur(std=(0.5, 1.5), p=0.3),
+                        tio.RandomGamma(log_gamma=(-0.3, 0.3), p=0.4),
+                        tio.RandomNoise(mean=0.0, std=(0.0, 0.25), p=0.4),
+                        tio.RandomBlur(std=(0.5, 1.5), p=0.4),
                         tio.Lambda(self._clean_tensor),
                         tio.Lambda(self._znorm_nonzero),
                         tio.Lambda(self._jitter_background),

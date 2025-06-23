@@ -172,6 +172,7 @@ if __name__ == "__main__":
                 if math.isnan(loss):
                     pbar.write("Skipping NaN batch")
                     continue
+                val_step += 1
                 val_loss += loss
                 avg_loss = val_loss / val_step
                 pbar.set_postfix(
@@ -180,7 +181,7 @@ if __name__ == "__main__":
                         "avg": f"{avg_loss:.4f}",
                     }
                 )
-        avg_val = val_loss / len(val_loader)
+        avg_val = val_loss / val_step
         print(f"Epoch {epoch}/{EPOCH_NUM} - Val Loss: {avg_val:.4f}")
 
         if avg_val < best_val_loss:
