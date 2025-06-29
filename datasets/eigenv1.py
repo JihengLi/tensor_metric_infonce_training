@@ -16,15 +16,18 @@ class VectorRandomFlip(tio.RandomFlip):
 
 class VectorRandomAffine(tio.RandomAffine):
     def apply_transform(self, subject):
-        affine_params = self.get_parameters(random=self.is_random)
-        R = torch.tensor(affine_params["matrix"][:3, :3], dtype=torch.float32)
-        transformed = tio.transforms.Affine(
-            matrix=affine_params["matrix"],
-            image_interpolation=self.image_interpolation,
-        )(subject)
-        v = transformed.dti.data[3:6].reshape(3, -1)
-        v = (R @ v).reshape(*transformed.dti.data[3:6].shape)
-        transformed.dti.data[3:6] = v
+        transformed = super().apply_transform(subject)
+        params = getattr(self, "parameters", None)
+        if params is None or "matrix" not in params:
+            return transformed
+        matrix = params["matrix"]
+        R = torch.as_tensor(matrix[:3, :3], dtype=torch.float32)
+        data = transformed["dti"].data  # (6, D, H, W)
+        C, D, H, W = data.shape
+        v = data[3:6].reshape(3, -1)  # (3, N)
+        v_rot = (R @ v).reshape(3, D, H, W)
+        new_data = torch.cat([data[:3], v_rot], dim=0)
+        transformed["dti"].set_data(new_data)
         return transformed
 
 
@@ -45,14 +48,14 @@ class EigenvalueVectorDataset(Dataset):
                         tio.Lambda(self._tensor_to_eigvals_v1),
                         tio.Lambda(self._znorm_nonzero),
                         tio.Lambda(self._resize_to_64),
-                        VectorRandomFlip(axes=(0, 1, 2), p=0.5),
-                        VectorRandomAffine(
-                            scales=(0.9, 1.1), degrees=15, translation=(5, 5, 5), p=0.7
-                        ),
+                        # VectorRandomFlip(axes=(0, 1, 2), p=0.5),
+                        # VectorRandomAffine(
+                        #     scales=(0.9, 1.1), degrees=15, translation=(5, 5, 5), p=0.7
+                        # ),
                         # TODO: VectorRandomElasticDeformation
-                        tio.RandomGamma(log_gamma=(-0.3, 0.3), p=0.3),
-                        tio.RandomNoise(mean=0.0, std=(0.0, 0.25), p=0.3),
-                        tio.RandomBlur(std=(0.5, 1.5), p=0.2),
+                        tio.RandomGamma(log_gamma=(-0.3, 0.3)),
+                        tio.RandomNoise(mean=0.0, std=(0.0, 0.25)),
+                        tio.RandomBlur(std=(0.5, 1.5)),
                         tio.Lambda(self._clean_tensor),
                         tio.Lambda(self._znorm_nonzero),
                         tio.Lambda(self._jitter_background),

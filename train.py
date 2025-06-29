@@ -4,15 +4,9 @@ import os, math, re
 import torch
 
 from datasets import *
-from models import Encoder
-from utils import (
-    init_weights,
-    process_train_batch,
-    process_val_batch,
-    save_checkpoint,
-    gpu_safe_context,
-)
-from losses import nt_xent_loss
+from models import *
+from utils import *
+from losses import *
 
 from tqdm import tqdm
 from pathlib import Path
@@ -42,8 +36,6 @@ if __name__ == "__main__":
         batch_size=64,
         shuffle=True,
         num_workers=8,
-        # persistent_workers=True,
-        # prefetch_factor=2,
         pin_memory=True,
         drop_last=True,
     )
@@ -54,13 +46,11 @@ if __name__ == "__main__":
         batch_size=64,
         shuffle=False,
         num_workers=8,
-        # persistent_workers=True,
-        # prefetch_factor=2,
         pin_memory=True,
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = Encoder(num_channels=6).to(device)
+    model = ResidualSEEncoder(layers=(3, 4, 6, 3), num_channels=6).to(device)
     model.apply(init_weights)
     decay, no_decay = [], []
     for n, p in model.named_parameters():

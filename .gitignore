@@ -178,5 +178,6 @@ local/
 out.log
 checkpoints/
 checkpoints-18/
+checkpoints-18-nonzeronorm/
 checkpoints-34/
 checkpoints-eigen/
