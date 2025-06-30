@@ -23,7 +23,6 @@ GlobalParams = collections.namedtuple(
         "batch_norm_momentum",
         "batch_norm_epsilon",
         "dropout_rate",
-        "num_classes",
         "width_coefficient",
         "depth_coefficient",
         "depth_divisor",
@@ -341,7 +340,6 @@ def efficientnet3d(
     dropout_rate=0.2,
     drop_connect_rate=0.2,
     image_size=None,
-    num_classes=1000,
     include_top=True,
 ):
     """Creates a efficientnet model."""
@@ -362,7 +360,6 @@ def efficientnet3d(
         batch_norm_epsilon=1e-3,
         dropout_rate=dropout_rate,
         drop_connect_rate=drop_connect_rate,
-        num_classes=num_classes,
         width_coefficient=width_coefficient,
         depth_coefficient=depth_coefficient,
         depth_divisor=8,
@@ -378,7 +375,6 @@ def get_model_params(model_name, override_params):
     """Get the block args and global params for a given model"""
     if model_name.startswith("efficientnet"):
         w, d, s, p = efficientnet_params(model_name)
-        # note: all models have drop connect rate = 0.2
         blocks_args, global_params = efficientnet3d(
             width_coefficient=w, depth_coefficient=d, dropout_rate=p, image_size=s
         )

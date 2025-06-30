@@ -50,7 +50,7 @@ if __name__ == "__main__":
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ResidualSEEncoder(layers=(3, 4, 6, 3), num_channels=6).to(device)
+    model = EfficientNetEncoder.from_name("efficientnet-b7", in_channels=6).to(device)
     model.apply(init_weights)
     decay, no_decay = [], []
     for n, p in model.named_parameters():
@@ -60,13 +60,13 @@ if __name__ == "__main__":
             {"params": decay, "weight_decay": 1e-2},
             {"params": no_decay, "weight_decay": 0.0},
         ],
-        lr=1e-4,
+        lr=5e-4,
         betas=(0.9, 0.95),
     )
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
         max_lr=1e-3,
-        div_factor=10,
+        div_factor=5,
         final_div_factor=1e4,
         pct_start=0.1,
         epochs=EPOCH_NUM,

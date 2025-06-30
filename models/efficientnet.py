@@ -192,9 +192,14 @@ class EfficientNetEncoder(nn.Module):
         )
 
         # Final linear layer
-        self._avg_pooling = nn.AdaptiveAvgPool3d(1)
+        self._avg_pooling = nn.AdaptiveAvgPool3d((1, 1, 1))
         self._dropout = nn.Dropout(self._global_params.dropout_rate)
-        self._fc = nn.Linear(out_channels, self._global_params.num_classes)
+        self._fc = nn.Sequential(
+            nn.Linear(out_channels, 512),
+            nn.ReLU(inplace=True),
+            nn.Linear(512, 128),
+            nn.LayerNorm(128),
+        )
         self._swish = MemoryEfficientSwish()
 
     def set_swish(self, memory_efficient=True):
