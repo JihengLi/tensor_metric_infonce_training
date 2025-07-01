@@ -12,8 +12,6 @@ from configs import *
 from tqdm import tqdm
 from pathlib import Path
 from sklearn.model_selection import train_test_split
-from torch.amp import GradScaler
-from torch.utils.data import DataLoader
 
 EPOCH_NUM = 12
 NTX_LOSS_TEM = 0.3
@@ -32,14 +30,14 @@ if __name__ == "__main__":
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    cfg = EfficientNetb7Config(
+    cfg = ConvNeXtV2BaseConfig(
         train_paths=train_paths, val_paths=val_paths, epochs=EPOCH_NUM, device=device
     )
     train_loader = cfg.train_loader
     val_loader = cfg.val_loader
     model = cfg.model
     optimizer = cfg.optimizer
-    scheduler = cfg.optimizer
+    scheduler = cfg.scheduler
     scaler = cfg.scaler
 
     start_epoch = 1
