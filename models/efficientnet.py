@@ -3,6 +3,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from .efficientnet_utils import *
+from utils import *
 
 
 class MBConvBlock3D(nn.Module):
@@ -78,7 +79,10 @@ class MBConvBlock3D(nn.Module):
         self._bn2 = nn.BatchNorm3d(
             num_features=final_oup, momentum=self._bn_mom, eps=self._bn_eps
         )
+
+        # Other tools
         self._swish = MemoryEfficientSwish()
+        self._drop_path = DropPath(global_params.drop_connect_rate)
 
     def forward(self, inputs, drop_connect_rate=None):
         """
@@ -111,9 +115,8 @@ class MBConvBlock3D(nn.Module):
             and self._block_args.stride == 1
             and input_filters == output_filters
         ):
-            if drop_connect_rate:
-                x = drop_connect(x, p=drop_connect_rate, training=self.training)
-            x = x + inputs  # skip connection
+            x = self._drop_path(x, tmp_drop_connect_rate=drop_connect_rate)
+            x = x + inputs
         return x
 
     def set_swish(self, memory_efficient=True):
@@ -195,10 +198,13 @@ class EfficientNetEncoder(nn.Module):
         self._avg_pooling = nn.AdaptiveAvgPool3d((1, 1, 1))
         self._dropout = nn.Dropout(self._global_params.dropout_rate)
         self._fc = nn.Sequential(
-            nn.Linear(out_channels, 512),
+            nn.Linear(out_channels, self._global_params.proj_hidden_dim),
             nn.ReLU(inplace=True),
-            nn.Linear(512, 128),
-            nn.LayerNorm(128),
+            nn.Linear(
+                self._global_params.proj_hidden_dim,
+                self._global_params.final_output_dim,
+            ),
+            nn.LayerNorm(self._global_params.final_output_dim),
         )
         self._swish = MemoryEfficientSwish()
 

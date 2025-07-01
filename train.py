@@ -7,6 +7,7 @@ from datasets import *
 from models import *
 from utils import *
 from losses import *
+from configs import *
 
 from tqdm import tqdm
 from pathlib import Path
@@ -30,51 +31,16 @@ if __name__ == "__main__":
         final_paths, test_size=0.2, random_state=42
     )
 
-    train_dataset = TensorDataset(path_list=train_paths, mode="train")
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=64,
-        shuffle=True,
-        num_workers=8,
-        pin_memory=True,
-        drop_last=True,
-    )
-
-    val_dataset = TensorDataset(path_list=val_paths, mode="val")
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=64,
-        shuffle=False,
-        num_workers=8,
-        pin_memory=True,
-    )
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = EfficientNetEncoder.from_name("efficientnet-b7", in_channels=6).to(device)
-    model.apply(init_weights)
-    decay, no_decay = [], []
-    for n, p in model.named_parameters():
-        (no_decay if n.endswith("bias") or "bn" in n else decay).append(p)
-    optimizer = torch.optim.AdamW(
-        [
-            {"params": decay, "weight_decay": 1e-2},
-            {"params": no_decay, "weight_decay": 0.0},
-        ],
-        lr=5e-4,
-        betas=(0.9, 0.95),
+    cfg = EfficientNetb7Config(
+        train_paths=train_paths, val_paths=val_paths, epochs=EPOCH_NUM, device=device
     )
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer,
-        max_lr=1e-3,
-        div_factor=5,
-        final_div_factor=1e4,
-        pct_start=0.1,
-        epochs=EPOCH_NUM,
-        steps_per_epoch=len(train_loader),
-        anneal_strategy="cos",
-        cycle_momentum=False,
-    )
-    scaler = GradScaler(init_scale=2**14, growth_interval=2000)
+    train_loader = cfg.train_loader
+    val_loader = cfg.val_loader
+    model = cfg.model
+    optimizer = cfg.optimizer
+    scheduler = cfg.optimizer
+    scaler = cfg.scaler
 
     start_epoch = 1
     best_val_loss = math.inf
