@@ -165,7 +165,7 @@ def convnextv2_femto(**kwargs):
     return model
 
 
-def convnext_pico(**kwargs):
+def convnextv2_pico(**kwargs):
     model = ConvNeXtV2Encoder(depths=[2, 2, 6, 2], dims=[64, 128, 256, 512], **kwargs)
     return model
 

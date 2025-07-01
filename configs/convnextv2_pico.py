@@ -6,7 +6,7 @@ from datasets import *
 from utils import *
 
 
-class ConvNeXtV2BaseConfig:
+class ConvNeXtV2PicoConfig:
     def __init__(self, train_paths, val_paths, epochs, device):
         self.train_paths = train_paths
         self.val_paths = val_paths
@@ -42,13 +42,13 @@ class ConvNeXtV2BaseConfig:
 
     def _build_model(self):
         model = ConvNeXtV2Encoder(
-            depths=[3, 3, 27, 3], dims=[128, 256, 512, 1024], proj_hidden_dim=2048
+            depths=[2, 2, 6, 2], dims=[64, 128, 256, 512], proj_hidden_dim=1024
         ).to(self.device)
         return model
 
     def _build_optimizer(self):
-        base_lr: float = 1e-4
-        weight_decay: float = 1e-3
+        base_lr: float = 3e-4
+        weight_decay: float = 1e-4
 
         visited = set()
         decay, no_decay = [], []
@@ -88,9 +88,9 @@ class ConvNeXtV2BaseConfig:
     def _build_scheduler_cosannealing(
         self,
     ):
-        warmup_pct: float = 0.10
+        warmup_pct: float = 1 / self.epochs
         start_factor: float = 1e-3
-        min_lr_ratio: float = 1 / 100
+        min_lr_ratio: float = 1 / 5
 
         steps_per_epoch = len(self.train_loader)
         total_steps = self.epochs * steps_per_epoch
@@ -121,8 +121,8 @@ class ConvNeXtV2BaseConfig:
     def _build_scheduler_onecycle(self):
         return torch.optim.lr_scheduler.OneCycleLR(
             self.optimizer,
-            max_lr=5e-4,
-            div_factor=5,
+            max_lr=1e-3,
+            div_factor=10,
             final_div_factor=1e2,
             pct_start=0.1,
             epochs=self.epochs,
