@@ -43,9 +43,9 @@ The model consists of a configurable backbone encoder paired with a lightweight 
 
 - **Backbone Encoders** (chosen via `configs/*.yaml`):
 
-  - **ResNet-50**: Standard ResNet-50 [He et al., 2016], pretrained on ImageNet. The final classification layer is removed, and the output feature map is global average pooled to a 2048-D vector.
-  - **ConvNeXt-T**: A modern convolutional design inspired by Transformer architectures [Liu et al., 2022]. We pool features from the last stage into a 768-D vector.
-  - **EfficientNet-B3**: Compound-scaled CNN architecture [Tan & Le, 2019], producing a 1536-D representation after global pooling.
+  - **SE-ResNet3D-18**: ResNet-18 enhanced with Squeeze-and-Excitation (SE) modules [Hu et al., 2018]. The SE blocks recalibrate channel-wise feature responses, and we remove the final classification layer, applying global average pooling to obtain a 256-D feature vector.
+  - **ConvNeXt3D-Pico**: A modern convolutional design inspired by Transformer architectures [Liu et al., 2022]. We pool features from the last stage into a 512-D vector.
+  - **EfficientNet3D-B3**: Compound-scaled CNN architecture [Tan & Le, 2019], producing a 1024-D representation after global pooling.
 
 - **Projection Head**: A two-layer MLP that maps backbone features to the 128-D embedding space:
   ```yaml
