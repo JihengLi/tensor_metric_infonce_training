@@ -1,4 +1,4 @@
-# Tensor Metric InfoNCE Training
+# Diffusion Tensor Metric InfoNCE
 
 **Author:** Jiheng Li  
 **Copyright:** This project and all its code, documentation, and related content are owned by Jiheng Li. Unauthorized reproduction or commercial use is prohibited.
