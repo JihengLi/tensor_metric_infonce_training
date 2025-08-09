@@ -23,9 +23,9 @@ class ResidualSENetConfig:
         train_dataset = TensorDataset(path_list=self.train_paths, mode="train")
         train_loader = DataLoader(
             train_dataset,
-            batch_size=64,
+            batch_size=128,
             shuffle=True,
-            num_workers=8,
+            num_workers=16,
             pin_memory=True,
             drop_last=True,
         )
@@ -33,24 +33,35 @@ class ResidualSENetConfig:
         val_dataset = TensorDataset(path_list=self.val_paths, mode="val")
         val_loader = DataLoader(
             val_dataset,
-            batch_size=64,
+            batch_size=128,
             shuffle=False,
-            num_workers=8,
+            num_workers=16,
             pin_memory=True,
         )
         return train_loader, val_loader
 
     def _build_model(self):
-        model = ResidualSEEncoder(
-            layers=(2, 2, 2, 2), in_channels=6, proj_hidden_dim=512
-        ).to(self.device)
+        model = ResidualSEEncoder().to(self.device)
+        with torch.no_grad():
+            dummy = torch.randn(2, 6, 64, 64, 64, device=self.device)
+            _ = model(dummy)
         model.apply(kaiming_normal_init)
         return model
 
     def _build_optimizer(self):
         decay, no_decay = [], []
-        for n, p in self.model.named_parameters():
-            (no_decay if n.endswith("bias") or "bn" in n else decay).append(p)
+        for m in self.model.modules():
+            for name, param in m.named_parameters(recurse=False):
+                if not param.requires_grad:
+                    continue
+                is_norm = isinstance(
+                    m, (nn.BatchNorm3d, nn.GroupNorm, nn.LayerNorm, nn.InstanceNorm3d)
+                )
+                if name.endswith("bias") or is_norm:
+                    no_decay.append(param)
+                else:
+                    decay.append(param)
+
         optimizer = torch.optim.AdamW(
             [
                 {"params": decay, "weight_decay": 1e-2},

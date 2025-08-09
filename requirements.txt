@@ -1,6 +1,9 @@
 numpy
 scipy
+scikit-learn
 nibabel
+torch
+torchio
 matplotlib
 tqdm
 six
